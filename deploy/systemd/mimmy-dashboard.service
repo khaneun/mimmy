@@ -7,7 +7,9 @@ Wants=network-online.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/opt/mimmy
-EnvironmentFile=-/opt/mimmy/.env
+Environment="MIMMY_USE_SECRETS_MANAGER=true"
+Environment="MIMMY_SECRETS_ID=mimmy/prod"
+Environment="AWS_REGION=ap-northeast-2"
 ExecStart=/home/ubuntu/.local/bin/uv run --frozen mimmy dashboard
 Restart=on-failure
 RestartSec=5

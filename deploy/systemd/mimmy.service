@@ -7,10 +7,9 @@ Wants=network-online.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/opt/mimmy
-EnvironmentFile=-/opt/mimmy/.env
-# Secrets Manager 사용 시 .env 대신 아래 두 줄로 교체:
-# Environment="MIMMY_USE_SECRETS_MANAGER=true"
-# Environment="MIMMY_SECRETS_ID=mimmy/prod"
+Environment="MIMMY_USE_SECRETS_MANAGER=true"
+Environment="MIMMY_SECRETS_ID=mimmy/prod"
+Environment="AWS_REGION=ap-northeast-2"
 ExecStart=/home/ubuntu/.local/bin/uv run --frozen mimmy loop
 Restart=on-failure
 RestartSec=5
