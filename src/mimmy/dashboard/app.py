@@ -36,7 +36,7 @@ _STATIC_DIR = Path(__file__).parent / "static"
 
 class ChatMessage(BaseModel):
     text: str
-    user_id: str
+    user_id: str = "dashboard"   # audit용 라벨. Basic Auth가 실제 인증을 담당.
 
 
 class ChatResponse(BaseModel):
@@ -108,21 +108,11 @@ class BasicAuthMiddleware:
 
 
 def _check_auth(request: Request) -> None:
-    """헤더 X-Mimmy-User 가 AUTHORIZED_TELEGRAM_IDS 에 있어야 통과.
+    """과거 X-Mimmy-User 헤더 인증. Basic Auth 미들웨어로 대체되어 no-op.
 
-    설정이 비어 있으면 통과(개발 모드). 운영에선 반드시 채워둘 것.
+    하위 호환을 위해 시그니처는 유지 — 이미 진입한 요청은 미들웨어를 통과한 상태다.
     """
-    s = get_settings()
-    allowed = s.authorized_ids
-    if not allowed:
-        return
-    raw = request.headers.get("x-mimmy-user", "")
-    try:
-        uid = int(raw)
-    except ValueError:
-        raise HTTPException(401, "missing or invalid X-Mimmy-User")
-    if uid not in allowed:
-        raise HTTPException(403, "unauthorized")
+    return
 
 
 # ─── API ───
@@ -312,11 +302,9 @@ def create_app() -> FastAPI:
         return {"status": "failed", "reason": out.decode(errors="ignore")[-400:]}
 
     # ── 챗 (자연어 → self-edit pipeline) ──
+    # 인증은 Basic Auth 미들웨어가 처리 — 여기서는 audit 라벨만 사용한다.
     @app.post("/chat", response_model=ChatResponse)
     async def chat(msg: ChatMessage, request: Request) -> ChatResponse:
-        s = get_settings()
-        if s.authorized_ids and int(msg.user_id) not in s.authorized_ids:
-            raise HTTPException(403, "unauthorized")
         from mimmy.self_edit.pipeline import propose_change
 
         result = await propose_change(msg.text, requested_by=msg.user_id)

@@ -29,6 +29,23 @@ _REALTIME_URL = "https://polling.finance.naver.com/api/realtime"
 _NEWS_URL = "https://m.stock.naver.com/api/news/stock/{code}"
 
 
+def _safe_json(resp: Any) -> Any | None:
+    """resp.json()는 charset 감지가 약해 일부 Naver 응답에서 UnicodeDecodeError를 던진다.
+    utf-8(replace) → cp949 순으로 폴백 디코드한 뒤 json.loads.
+    """
+    try:
+        return resp.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        pass
+    raw = resp.content
+    for enc in ("utf-8", "cp949"):
+        try:
+            return json.loads(raw.decode(enc, errors="replace"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+    return None
+
+
 # ─── 순수 파서 ───
 
 
@@ -111,10 +128,9 @@ async def fetch_kr_quote(instrument: Instrument) -> Quote | None:
         if resp.status_code != 200:
             log.warning("naver_quote_non_200", status=resp.status_code, symbol=instrument.symbol)
             return None
-        try:
-            payload = resp.json()
-        except json.JSONDecodeError:
-            log.warning("naver_quote_bad_json", body=resp.text[:200])
+        payload = _safe_json(resp)
+        if payload is None:
+            log.warning("naver_quote_bad_json", body=resp.content[:200])
             return None
         return parse_quote_json(payload, instrument)
 
@@ -130,10 +146,9 @@ async def fetch_kr_news(ticker: Ticker, page_size: int = 20) -> list[NewsItem]:
         if resp.status_code != 200:
             log.warning("naver_news_non_200", status=resp.status_code, symbol=ticker.symbol)
             return []
-        try:
-            payload = resp.json()
-        except json.JSONDecodeError:
-            log.warning("naver_news_bad_json", body=resp.text[:200])
+        payload = _safe_json(resp)
+        if payload is None:
+            log.warning("naver_news_bad_json", body=resp.content[:200])
             return []
         return parse_news_json(payload, ticker)
 

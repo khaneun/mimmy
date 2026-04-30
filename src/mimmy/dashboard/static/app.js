@@ -8,16 +8,13 @@
   const root = $('#view-root');
   const toastEl = $('#toast');
 
-  // 로컬스토리지에 저장한 user id. 설정 탭에서 입력.
-  const getUserId = () => localStorage.getItem('mimmy_user_id') || '';
-  const setUserId = (v) => localStorage.setItem('mimmy_user_id', v || '');
-
+  // 인증은 서버 측 HTTP Basic Auth가 담당 — 브라우저가 자동으로 Authorization 헤더를 단다.
   const api = async (path, opts = {}) => {
     const headers = Object.assign(
-      { 'Content-Type': 'application/json', 'X-Mimmy-User': getUserId() },
+      { 'Content-Type': 'application/json' },
       opts.headers || {}
     );
-    const res = await fetch(path, Object.assign({}, opts, { headers }));
+    const res = await fetch(path, Object.assign({}, opts, { headers, credentials: 'same-origin' }));
     if (!res.ok) {
       let msg = `${res.status}`;
       try { const j = await res.json(); msg = j.detail || j.reason || msg; } catch (_) {}
@@ -64,7 +61,8 @@
       else if (k === 'on') for (const [ev, fn] of Object.entries(v)) el.addEventListener(ev, fn);
       else if (v != null) el.setAttribute(k, v);
     }
-    for (const c of [].concat(children || [])) {
+    const flat = [].concat(children || []).flat(Infinity);
+    for (const c of flat) {
       if (c == null) continue;
       el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
     }
@@ -369,8 +367,6 @@
       const ta = $('#chat-input');
       const text = (ta.value || '').trim();
       if (!text) return;
-      const uid = getUserId();
-      if (!uid) { toast('설정에서 Telegram user id 를 먼저 입력하세요', 'err'); return; }
       const log = loadChat();
       log.push({ role: 'me', text });
       saveChat(log); render();
@@ -380,7 +376,7 @@
       try {
         const r = await api('/chat', {
           method: 'POST',
-          body: JSON.stringify({ text, user_id: uid }),
+          body: JSON.stringify({ text, user_id: 'dashboard' }),
         });
         log.pop();
         log.push({ role: 'bot', text: r.reply, pr: r.artifact_url || null });
@@ -400,16 +396,6 @@
     const s = await api('/api/settings');
     root.innerHTML = '';
     const env = s.env, rt = s.runtime || {};
-
-    // 사용자 ID (로컬)
-    root.appendChild(h('div', { class: 'card' }, [
-      h('h3', {}, '사용자'),
-      h('label', { class: 'field' }, [
-        h('span', {}, 'Telegram user id (권한 확인용)'),
-        h('input', { class: 'input', id: 'uid', value: getUserId(), inputmode: 'numeric' }),
-      ]),
-      h('button', { class: 'btn', on: { click: () => { setUserId($('#uid').value.trim()); toast('저장됨', 'ok'); } } }, '저장'),
-    ]));
 
     // 매매 모드: broker + kis_env
     const curBroker = rt.broker || env.broker;

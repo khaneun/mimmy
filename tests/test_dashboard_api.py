@@ -147,16 +147,13 @@ def test_home_reflects_snapshot(client):
     assert snap["last_quote"]["last"] == 72_000
 
 
-def test_auth_enforced_when_ids_configured(client, monkeypatch):
-    """AUTHORIZED_TELEGRAM_IDS 가 세팅되면 변경 API는 헤더를 요구한다."""
-    os.environ["AUTHORIZED_TELEGRAM_IDS"] = "12345"
-    from mimmy.config import get_settings
-    get_settings.cache_clear()
-    r = client.post("/api/pause")  # no X-Mimmy-User
-    assert r.status_code == 401
-    r = client.post("/api/pause", headers={"X-Mimmy-User": "99999"})
-    assert r.status_code == 403
-    r = client.post("/api/pause", headers={"X-Mimmy-User": "12345"})
+def test_pause_endpoint_no_legacy_auth(client):
+    """X-Mimmy-User 헤더 인증은 폐지됨 — Basic Auth 미들웨어가 인증 담당.
+
+    create_app에서 미들웨어가 user/pw 환경변수가 비어있을 때만 등록되지 않으므로,
+    테스트 클라이언트는 미들웨어 없이 동작한다. 헤더 없이도 200이 나와야 한다.
+    """
+    r = client.post("/api/pause")
     assert r.status_code == 200
 
 
