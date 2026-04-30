@@ -1,0 +1,16 @@
+[Unit]
+Description=Mimmy dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/mimmy
+EnvironmentFile=-/opt/mimmy/.env
+ExecStart=/home/ubuntu/.local/bin/uv run --frozen mimmy dashboard
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
