@@ -12,6 +12,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import secrets as _secrets
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +67,46 @@ class RestartRequest(BaseModel):
 # ─── 권한 ───
 
 
+class BasicAuthMiddleware:
+    """대시보드 전체에 HTTP Basic Auth 강제. /healthz는 제외.
+
+    user/pw가 둘 다 설정됐을 때만 활성화 — 비어있으면 미들웨어가 등록되지 않는다.
+    """
+
+    def __init__(self, app, username: str, password: str) -> None:
+        self.app = app
+        self._user = username
+        self._pw = password
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        if scope.get("path", "") == "/healthz":
+            await self.app(scope, receive, send)
+            return
+        headers = dict(scope.get("headers", []))
+        auth = headers.get(b"authorization", b"").decode("latin-1", errors="ignore")
+        if auth.lower().startswith("basic "):
+            try:
+                decoded = base64.b64decode(auth.split(" ", 1)[1]).decode("utf-8", errors="ignore")
+                u, _, p = decoded.partition(":")
+                if _secrets.compare_digest(u, self._user) and _secrets.compare_digest(p, self._pw):
+                    await self.app(scope, receive, send)
+                    return
+            except Exception:
+                pass
+        await send({
+            "type": "http.response.start",
+            "status": 401,
+            "headers": [
+                (b"www-authenticate", b'Basic realm="mimmy"'),
+                (b"content-type", b"text/plain; charset=utf-8"),
+            ],
+        })
+        await send({"type": "http.response.body", "body": b"Authentication required"})
+
+
 def _check_auth(request: Request) -> None:
     """헤더 X-Mimmy-User 가 AUTHORIZED_TELEGRAM_IDS 에 있어야 통과.
 
@@ -88,6 +130,14 @@ def _check_auth(request: Request) -> None:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Mimmy Dashboard", version="0.0.1")
+
+    s = get_settings()
+    if s.dashboard_basic_auth_user and s.dashboard_basic_auth_password:
+        app.add_middleware(
+            BasicAuthMiddleware,
+            username=s.dashboard_basic_auth_user,
+            password=s.dashboard_basic_auth_password,
+        )
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

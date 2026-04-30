@@ -88,28 +88,22 @@ async def cmd_improve(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def notify_startup(app: Application) -> None:
-    """봇 부팅 직후 authorized 사용자들에게 시작 알림과 대시보드 접근 안내를 보낸다."""
+    """봇 부팅 직후 authorized 사용자들에게 시작 알림과 대시보드 URL을 보낸다."""
     s = get_settings()
     ids = s.authorized_ids
     if not ids:
         log.info("startup_notify_skipped_no_authorized_ids")
         return
 
-    host_hint = await _public_host_hint()
-    tunnel_cmd = (
-        f"ssh -i ~/kitty-key.pem -L {s.dashboard_port}:localhost:{s.dashboard_port} ubuntu@{host_hint}"
-        if host_hint
-        else f"ssh -L {s.dashboard_port}:localhost:{s.dashboard_port} ubuntu@<EC2_IP>"
-    )
+    host = await _public_host_hint()
+    dashboard_url = f"http://{host}:{s.dashboard_port}" if host else f"http://<EC2_IP>:{s.dashboard_port}"
     text = (
         "mimmy 서버 시작\n"
         f"- 대상: {s.market.value}:{s.ticker}\n"
         f"- env: {s.env}\n"
         f"- broker: {s.broker}\n"
         "\n"
-        "대시보드 (SSH 터널 필요):\n"
-        f"  $ {tunnel_cmd}\n"
-        f"  http://localhost:{s.dashboard_port}\n"
+        f"대시보드: {dashboard_url}\n"
         "\n"
         "/help 으로 명령어 확인."
     )

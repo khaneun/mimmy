@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     # dashboard
     dashboard_host: str = Field("0.0.0.0", alias="DASHBOARD_HOST")
     dashboard_port: int = Field(8787, alias="DASHBOARD_PORT")
+    dashboard_basic_auth_user: str = Field("", alias="DASHBOARD_BASIC_AUTH_USER")
+    dashboard_basic_auth_password: str = Field("", alias="DASHBOARD_BASIC_AUTH_PASSWORD")
 
     # self-edit
     self_edit_auto_merge: bool = Field(False, alias="SELF_EDIT_AUTO_MERGE")
